@@ -1,0 +1,60 @@
+
+installation :: http://trudesk.io/v1/guide/installation.html
+
+repository :: https://github.com/polonel/trudesk
+
+
+nginx proxy configuration ::
+=======================================
+upstream socket_nodes {
+    ip_hash;
+    # IP Address of Host running Trudesk
+    server localhost:8118;
+}
+
+server {
+    listen       80;
+    server_name  trudesk-develop.com;
+    rewrite ^ https://$http_host$request_uri? permanent;    # force redirect http to https
+
+    # Enables or disables emitting nginx version on error pages and in the "Server" response header field.
+    server_tokens off;
+}
+
+server {
+    listen       443;
+    server_name  trudesk-develop.com;
+    ssl on;
+    ssl_certificate /etc/nginx/ssl/ssl.crt;        # path to your cacert.pem
+    ssl_certificate_key /etc/nginx/ssl/ssl.key;    # path to your privkey.pem
+
+    location ~ ^/(uploads/) {
+            root /path/to/trudesk/public;
+            access_log off;
+            expires modified +1h;
+    }
+
+    location / {
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $host;
+#            proxy_cache one;
+#            proxy_cache_key trudesk$request_uri$scheme;
+            proxy_pass http://socket_nodes;
+    }
+
+    # redirect server error pages to the static page /40x.html
+    #
+    error_page  404              /404.html;
+    location = /40x.html {
+    }
+
+    # redirect server error pages to the static page /50x.html
+    #
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+    }
+}
+=======================================
